@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitHub Release Subscriber</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 460px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo svg { fill: #e6edf3; }
+
+    .logo h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #8b949e;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 14px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 16px;
+    }
+
+    input:focus { border-color: #58a6ff; }
+    input.error-field { border-color: #f85149; }
+    input::placeholder { color: #484f58; }
+
+    .field-error {
+      font-size: 12px;
+      color: #f85149;
+      margin-top: -12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button[type="submit"]:hover:not(:disabled) { background: #2ea043; }
+    button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .banner {
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .banner.success {
+      background: #0f2f0f;
+      border: 1px solid #2ea043;
+      color: #3fb950;
+      display: block;
+    }
+
+    .banner.error-banner {
+      background: #2a0f0f;
+      border: 1px solid #f85149;
+      color: #f85149;
+      display: block;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #21262d;
+      margin: 28px 0;
+    }
+
+    .lookup-toggle {
+      background: none;
+      border: none;
+      color: #58a6ff;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0;
+      width: 100%;
+      text-align: left;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lookup-toggle:hover { color: #79c0ff; }
+
+    .lookup-panel { display: none; }
+    .lookup-panel.open { display: block; }
+
+    .lookup-result {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #8b949e;
+    }
+
+    .sub-item {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sub-item .repo { color: #e6edf3; font-weight: 500; }
+    .sub-item .status {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: #21262d;
+      color: #8b949e;
+    }
+
+    .sub-item .status.confirmed {
+      background: #0f2f0f;
+      color: #3fb950;
+    }
+
+    footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #484f58;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg height="28" viewBox="0 0 16 16" width="28" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+          0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+          -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+          .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+          -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27
+          .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12
+          .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
+          0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      <h1>Release Subscriber</h1>
+    </div>
+
+    <p class="subtitle">Subscribe to get notified by email whenever a new release is published for a GitHub repository.</p>
+
+    <div id="banner" class="banner" role="alert"></div>
+
+    <form id="subscribeForm" novalidate>
+      <label for="email">Email address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" />
+      <div class="field-error" id="emailError">Please enter a valid email address.</div>
+
+      <label for="repo">GitHub repository</label>
+      <input type="text" id="repo" name="repo" placeholder="owner/repository" autocomplete="off" />
+      <div class="field-error" id="repoError">Format must be owner/repository (e.g. octocat/hello-world).</div>
+
+      <button type="submit" id="submitBtn">Subscribe</button>
+    </form>
+
+    <hr class="divider" />
+
+    <button class="lookup-toggle" id="lookupToggle" type="button">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+      </svg>
+      Look up my subscriptions
+    </button>
+
+    <div class="lookup-panel" id="lookupPanel">
+      <label for="lookupEmail">Your email</label>
+      <input type="email" id="lookupEmail" placeholder="you@example.com" />
+      <button type="button" id="lookupBtn"
+        style="background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;width:100%;">
+        Find subscriptions
+      </button>
+      <div class="lookup-result" id="lookupResult"></div>
+    </div>
+  </div>
+
+  <footer>GitHub Release Notifier &mdash; git-update-notifier</footer>
+
+  <script>
+    const API_BASE = window.__API_BASE_URL__ || 'http://localhost:3000';
+
+    const $ = id => document.getElementById(id);
+    const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+    const isRepo  = v => /^[\w.-]+\/[\w.-]+$/.test(v.trim());
+
+    function showBanner(type, msg) {
+      const b = $('banner');
+      b.className = 'banner ' + (type === 'success' ? 'success' : 'error-banner');
+      b.textContent = msg;
+    }
+
+    function clearBanner() {
+      const b = $('banner');
+      b.className = 'banner';
+      b.textContent = '';
+    }
+
+    $('subscribeForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearBanner();
+
+      const email = $('email').value.trim();
+      const repo  = $('repo').value.trim();
+      let valid = true;
+
+      if (!isEmail(email)) {
+        $('email').classList.add('error-field');
+        $('emailError').style.display = 'block';
+        valid = false;
+      } else {
+        $('email').classList.remove('error-field');
+        $('emailError').style.display = 'none';
+      }
+
+      if (!isRepo(repo)) {
+        $('repo').classList.add('error-field');
+        $('repoError').style.display = 'block';
+        valid = false;
+      } else {
+        $('repo').classList.remove('error-field');
+        $('repoError').style.display = 'none';
+      }
+
+      if (!valid) return;
+
+      const btn = $('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Subscribing…';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, repo })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 201) {
+          showBanner('success', '✓ Check your email — a confirmation link has been sent.');
+          $('subscribeForm').reset();
+        } else if (res.status === 409) {
+          showBanner('error', 'You\'re already subscribed to this repository.');
+        } else if (res.status === 400) {
+          showBanner('error', data.message || 'Invalid request. Please check your inputs.');
+        } else {
+          showBanner('error', 'Something went wrong. Please try again later.');
+        }
+      } catch {
+        showBanner('error', 'Network error — please check your connection and try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Subscribe';
+      }
+    });
+
+    $('lookupToggle').addEventListener('click', () => {
+      const panel = $('lookupPanel');
+      panel.classList.toggle('open');
+      $('lookupResult').innerHTML = '';
+    });
+
+    $('lookupBtn').addEventListener('click', async () => {
+      const email = $('lookupEmail').value.trim();
+      const result = $('lookupResult');
+
+      if (!isEmail(email)) {
+        result.innerHTML = '<span style="color:#f85149">Please enter a valid email.</span>';
+        return;
+      }
+
+      result.textContent = 'Loading…';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/subscriptions?email=${encodeURIComponent(email)}`);
+        const data = await res.json().catch(() => []);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          result.textContent = 'No subscriptions found for this email.';
+          return;
+        }
+
+        result.innerHTML = data.map(s => `
+          <div class="sub-item">
+            <span class="repo">${escapeHtml(s.repo)}</span>
+            <span class="status ${s.confirmed ? 'confirmed' : ''}">${s.confirmed ? 'Confirmed' : 'Pending'}</span>
+          </div>
+        `).join('');
+      } catch {
+        result.innerHTML = '<span style="color:#f85149">Failed to fetch subscriptions.</span>';
+      }
+    });
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+  </script>
+</body>
+</html>

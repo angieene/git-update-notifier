@@ -1,17 +1,17 @@
-import type { Subscription } from '../../domain/subscription';
+import type { SubscriptionWithRepo } from '../../application/ports/subscription-repository';
 
 export interface SubscriptionDto {
-  id: string;
   email: string;
-  repositoryId: number;
-  createdAt: string;
+  repo: string;
+  confirmed: boolean;
+  last_seen_tag: string | null;
 }
 
-export function toSubscriptionDto(sub: Subscription): SubscriptionDto {
+export function toSubscriptionDto({ subscription, owner, name, lastSeenTag }: SubscriptionWithRepo): SubscriptionDto {
   return {
-    id: sub.id,
-    email: sub.email,
-    repositoryId: sub.repositoryId,
-    createdAt: sub.createdAt.toISOString(),
+    email: subscription.email,
+    repo: `${owner}/${name}`,
+    confirmed: subscription.confirmedAt !== null,
+    last_seen_tag: lastSeenTag,
   };
 }

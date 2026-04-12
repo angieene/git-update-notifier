@@ -23,39 +23,41 @@ export class ScanService {
     for (const r of repos) {
       if (signal?.aborted) return;
 
+      let release: Awaited<ReturnType<typeof this.source.latestRelease>>;
       try {
-        const release = await this.source.latestRelease(r.owner, r.name);
-
-        // First scan seeds the tag but sends no notification
-        if (r.lastSeenTag === null) {
-          await this.repo.advanceLastSeen(r.id, release.tag);
-          continue;
-        }
-
-        // No new release
-        if (release.tag === r.lastSeenTag) continue;
-
-        const subscribers = await this.repo.listSubscribersForRepo(r.id);
-
-        for (const email of subscribers) {
-          if (signal?.aborted) return;
-          try {
-            await this.notifier.send({ email, ownerRepo: `${r.owner}/${r.name}`, release });
-          } catch (err) {
-            this.logger.warn({ err, email, repo: `${r.owner}/${r.name}` }, 'notification failed');
-          }
-        }
-
-        // Advance only after all notifications attempted
-        await this.repo.advanceLastSeen(r.id, release.tag);
-        this.logger.info(`notified ${subscribers.length} subscriber(s) for ${r.owner}/${r.name}@${release.tag}`);
+        release = await this.source.latestRelease(r.owner, r.name);
       } catch (err) {
         if (err instanceof RateLimitedError) {
-          this.logger.warn('rate limited, abandoning tick');
+          this.logger.warn({ retryAfter: err.retryAfterSeconds }, 'rate limited, abandoning tick');
           return;
         }
-        this.logger.warn({ err, repo: `${r.owner}/${r.name}` }, 'scan failed for repo');
+        this.logger.warn({ err, repo: r }, 'scan failed for repo');
+        continue;
       }
+
+      if (!release.tag) {
+        continue; // repo has no releases yet
+      }
+
+      if (r.lastSeenTag === null) {
+        await this.repo.advanceLastSeen(r.id, release.tag);
+        continue; // silent seed, no notification
+      }
+
+      if (r.lastSeenTag === release.tag) {
+        continue; // nothing new
+      }
+
+      const subscribers = await this.repo.listSubscribersForRepo(r.id);
+      for (const sub of subscribers) {
+        try {
+          await this.notifier.notifyNewRelease(sub.email, release, r, sub.unsubscribeToken);
+        } catch (err) {
+          this.logger.warn({ err, email: sub.email, tag: release.tag }, 'notification failed');
+        }
+      }
+
+      await this.repo.advanceLastSeen(r.id, release.tag);
     }
   }
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SubscriptionService } from './subscription-service';
 import { FakeSubscriptionRepository } from '../test/fakes/fake-subscription-repository';
 import { FakeReleaseSource } from '../test/fakes/fake-release-source';
+import { FakeNotifier } from '../test/fakes/fake-notifier';
 import {
   InvalidFormatError,
   RepoNotFoundError,
@@ -18,12 +19,14 @@ const FAKE_RELEASE = {
 describe('SubscriptionService', () => {
   let repo: FakeSubscriptionRepository;
   let source: FakeReleaseSource;
+  let notifier: FakeNotifier;
   let svc: SubscriptionService;
 
   beforeEach(() => {
     repo = new FakeSubscriptionRepository();
     source = new FakeReleaseSource();
-    svc = new SubscriptionService(repo, source);
+    notifier = new FakeNotifier();
+    svc = new SubscriptionService(repo, source, notifier);
     source.setRelease('owner', 'repo', FAKE_RELEASE);
   });
 
@@ -33,6 +36,14 @@ describe('SubscriptionService', () => {
     expect(sub.email).toBe('user@example.com');
     expect(typeof sub.repositoryId).toBe('number');
     expect(repo.repos[0]?.lastSeenTag).toBe('v1.0.0');
+  });
+
+  it('sends a confirmation email on subscribe', async () => {
+    await svc.create('user@example.com', 'owner/repo');
+
+    expect(notifier.confirmationsSent).toHaveLength(1);
+    expect(notifier.confirmationsSent[0]?.to).toBe('user@example.com');
+    expect(typeof notifier.confirmationsSent[0]?.confirmationToken).toBe('string');
   });
 
   it('rejects invalid email', async () => {

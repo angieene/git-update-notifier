@@ -10,8 +10,8 @@ import { createHttpApp } from './infrastructure/http/app';
 import { createLogger } from './infrastructure/logger';
 import { runMigrations } from './infrastructure/postgres/migrations';
 import { PgSubscriptionRepository } from './infrastructure/postgres/pg-subscription-repository';
-import { startScanner } from './infrastructure/scheduler/scanner';
-import { LogNotifier } from './infrastructure/smtp/log-notifier';
+import { startScanner } from './infrastructure/scheduler/start-scanner';
+import { LogNotifier } from './infrastructure/log-notifier/log-notifier';
 import { SmtpNotifier } from './infrastructure/smtp/smtp-notifier';
 import type { ReleaseSource } from './application/ports/release-source';
 import type { Notifier } from './application/ports/notifier';
@@ -25,14 +25,21 @@ async function bootstrap(): Promise<void> {
   await runMigrations(pool, 'migrations');
 
   const httpClient = axios.create({
+    baseURL: 'https://api.github.com',
     timeout: 10_000,
-    headers: { 'User-Agent': 'git-update-subscriber/1.0' },
+    headers: {
+      'User-Agent': 'git-update-subscriber/1.0',
+      'Accept': 'application/vnd.github+json',
+      ...(config.githubToken ? { 'Authorization': `Bearer ${config.githubToken}` } : {}),
+    },
+    // Don't throw on non-2xx; let the adapter inspect every response uniformly
+    validateStatus: () => true,
   });
 
   // Adapters
   const repo = new PgSubscriptionRepository(pool);
 
-  let source: ReleaseSource = new GithubReleaseSource(httpClient, config.githubToken);
+  let source: ReleaseSource = new GithubReleaseSource(httpClient, logger);
   if (config.redisUrl) {
     const redis = new Redis(config.redisUrl);
     source = new CachedReleaseSource(source, redis, 600);
@@ -40,11 +47,11 @@ async function bootstrap(): Promise<void> {
   }
 
   const notifier: Notifier = config.smtp.host
-    ? new SmtpNotifier(config.smtp)
+    ? new SmtpNotifier({ ...config.smtp, host: config.smtp.host, appBaseUrl: config.appBaseUrl }, logger)
     : new LogNotifier(logger);
 
   // Application services
-  const subscriptionService = new SubscriptionService(repo, source);
+  const subscriptionService = new SubscriptionService(repo, source, notifier);
   const scanService = new ScanService(repo, source, notifier, logger);
 
   // Transport
@@ -54,12 +61,16 @@ async function bootstrap(): Promise<void> {
   });
 
   // Background scanner
-  const stopScanner = startScanner(scanService, config.scanIntervalMs, logger);
+  const stopScanner = startScanner(
+    scanService,
+    { intervalMs: config.scanIntervalMs, initialDelayMs: config.scanInitialDelayMs },
+    logger,
+  );
 
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
     logger.info('shutting down');
-    stopScanner();
+    await stopScanner();
     server.close();
     await pool.end();
     process.exit(0);

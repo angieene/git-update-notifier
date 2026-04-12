@@ -1,11 +1,7 @@
 import type { Release } from '../../domain/release';
-
-export interface NotificationPayload {
-  email: string;
-  ownerRepo: string;
-  release: Release;
-}
+import type { TrackedRepo } from '../../domain/tracked-repo';
 
 export interface Notifier {
-  send(payload: NotificationPayload): Promise<void>;
+  notifyNewRelease(to: string, release: Release, repo: TrackedRepo, unsubscribeToken: string): Promise<void>;
+  sendConfirmationEmail(to: string, confirmationToken: string): Promise<void>;
 }

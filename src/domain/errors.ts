@@ -36,3 +36,7 @@ export class RateLimitedError extends DomainError {
 export class UpstreamUnavailableError extends DomainError {
   readonly code = 'upstream_unavailable';
 }
+
+export class TokenNotFoundError extends DomainError {
+  readonly code = 'token_not_found';
+}

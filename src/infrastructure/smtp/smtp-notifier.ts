@@ -1,35 +1,71 @@
-import nodemailer from 'nodemailer';
-import type { Notifier, NotificationPayload } from '../../application/ports/notifier';
-import type { Config } from '../../config';
+import { createTransport } from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+import type { Notifier } from '../../application/ports/notifier';
+import type { Release } from '../../domain/release';
+import type { TrackedRepo } from '../../domain/tracked-repo';
+import type { Logger } from '../logger';
+import { renderBody, renderSubject } from './templates/new-release';
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password: string;
+  from: string;
+  appBaseUrl: string;
+}
 
 export class SmtpNotifier implements Notifier {
-  private readonly transporter: nodemailer.Transporter;
-  private readonly from: string;
+  private readonly transporter: Transporter;
 
-  constructor(smtp: Config['smtp']) {
-    this.transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+  constructor(
+    private readonly config: SmtpConfig,
+    private readonly logger: Logger,
+  ) {
+    this.transporter = createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: { user: config.username, pass: config.password },
     });
-    this.from = smtp.from ?? 'noreply@release-notifier.local';
   }
 
-  async send(payload: NotificationPayload): Promise<void> {
-    const { email, ownerRepo, release } = payload;
-    await this.transporter.sendMail({
-      from: this.from,
-      to: email,
-      subject: `New release: ${ownerRepo} ${release.tag}`,
-      text: [
-        `${ownerRepo} just published ${release.tag} — ${release.name}`,
-        '',
-        release.url,
-      ].join('\n'),
-      html: [
-        `<p><strong>${ownerRepo}</strong> published <strong>${release.tag}</strong> — ${release.name}</p>`,
-        `<p><a href="${release.url}">${release.url}</a></p>`,
-      ].join('\n'),
-    });
+  async notifyNewRelease(to: string, release: Release, repo: TrackedRepo, unsubscribeToken: string): Promise<void> {
+    const ctx = { repo, release, unsubscribeToken, appBaseUrl: this.config.appBaseUrl };
+    const subject = renderSubject(ctx);
+    const text = renderBody(ctx);
+
+    try {
+      await this.transporter.sendMail({
+        from: this.config.from,
+        to,
+        subject,
+        text,
+      });
+    } catch (err) {
+      this.logger.warn({ err, to, tag: release.tag }, 'smtp send failed');
+      throw err;
+    }
+  }
+
+  async sendConfirmationEmail(to: string, confirmationToken: string): Promise<void> {
+    const confirmUrl = `${this.config.appBaseUrl}/api/confirm/${confirmationToken}`;
+    const subject = 'Confirm your GitHub release subscription';
+    const text = [
+      'You have subscribed to GitHub release notifications.',
+      '',
+      `Please confirm your subscription by visiting:`,
+      confirmUrl,
+      '',
+      'If you did not request this, you can ignore this email.',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({ from: this.config.from, to, subject, text });
+    } catch (err) {
+      this.logger.warn({ err, to }, 'smtp confirmation send failed');
+      throw err;
+    }
   }
 }

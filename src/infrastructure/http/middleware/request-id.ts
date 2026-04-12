@@ -9,7 +9,8 @@ declare global {
   }
 }
 
-export function requestIdMiddleware(req: Request, _res: Response, next: NextFunction): void {
+export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
   req.id = (req.headers['x-request-id'] as string | undefined) ?? uuidv4();
+  res.setHeader('X-Request-Id', req.id);
   next();
 }
