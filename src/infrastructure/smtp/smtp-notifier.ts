@@ -27,7 +27,9 @@ export class SmtpNotifier implements Notifier {
       host: config.host,
       port: config.port,
       secure: config.secure,
-      auth: { user: config.username, pass: config.password },
+      ...(config.username || config.password
+        ? { auth: { user: config.username, pass: config.password } }
+        : {}),
     });
   }
 
